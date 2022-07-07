@@ -58,7 +58,10 @@
 	rjmp start
 
 .org ADCCaddr
-	rjmo 	handle_adc_conversion
+	rjmp 	handle_adc_conversion
+
+.org URXCaddr
+    jmp isr_dato_recibido_usart
 
 .org INT_VECTORS_SIZE
 
@@ -74,24 +77,10 @@ start:
 	; Realizo las configuraciones iniciales
 	rcall	configure_ports		; Configuro los puertos
 	rcall	configure_timers	; Configuro el WGM de los timers
-	rcall	configure_int0		; Configuro la int0
-	rcall	configure_int1		; Configuro la int1
-
-	; Habilito las interrupciones
-	rcall	enable_int0
-	rcall	enable_int1
-	rcall 	enable_timers_interrupts
-
-	clr		DEBOUNCE_1_FINISHED ; Limpio los registros para que comiencen en cero
-	clr		DEBOUNCE_2_FINISHED
-	rcall 	initialize_timer1 ; Inicializo el timer encargado de mover el servo
 	sei		; Habilito las interrupciones
+	rcall show_init_msg2 ;mostrar ensaje inicial
 
 main_loop:
-	sbrc 	DEBOUNCE_1_FINISHED, 0 ; Si el valor del primer bit menos significativo es cero, salteo la siguiente instruccion
-	rcall 	check_switch_1
-	sbrc 	DEBOUNCE_2_FINISHED, 0 
-	rcall 	check_switch_2
 	rjmp	main_loop
 
 // ToDo: las siguientes funciones cambiar para las teclas, creo que en modo REMOTO las teclas
@@ -414,3 +403,50 @@ disable_adc:
 
 ; ***************************** INTERRUPT HANDLERS ***********************************
 
+;*************************************************************************************
+; Subrutinas de configuracion lectura y escritura de USART
+;
+;*************************************************************************************
+
+USART_Init:
+	; Set baud rate
+	push r16
+	push r17
+	ldi r16, 103
+	ldi r17, 0
+	sts UBRR0H, r17
+	sts UBRR0L, r16
+	; Enable receiver and transmitter
+	ldi r16, (1<<RXEN0)|(1<<TXEN0)
+	sts UCSR0B,r16
+	; Set frame format: 8data, 2stop bit
+	ldi r16, (1<<USBS0)|(3<<UCSZ00)
+	sts UCSR0C,r16
+	pop r17
+	pop r16
+	ret
+
+USART_Transmit:
+	; Wait for empty transmit buffer
+	lds r17,UCSR0A
+	sbrs r17,UDRE0
+	rjmp USART_Transmit
+	; Put data (r16) into buffer, sends the data
+	sts UDR0,r16
+	ret
+	
+USART_Receive:
+	; Wait for data to be received
+	lds r17, UCSR0A
+	sbrs r17, RXC0
+	rjmp USART_Receive
+	; Get and return received data from buffer
+	lds r16, UDR0
+	ret
+
+
+//len = 45
+//Tabla con el mensaje "Envíe R para pasar a control por modo remoto" en ASCII
+MSJ: .DB 69, 110, 118, 195, 173, 101, 32, 82, 32, 112, 97, 114, 97, 32, \
+112, 97, 115, 97, 114, 32, 97, 32, 99, 111, 110, 116, 114, 111, 108, 32, 112, \
+111, 114, 32, 109, 111, 100, 111, 32, 114, 101, 109, 111, 116, 111
