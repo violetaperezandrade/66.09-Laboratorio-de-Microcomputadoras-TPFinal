@@ -155,7 +155,7 @@ set_default_position_servos:
 ;	
 ;*************************************************************************************
 increase_x_position:
-	ldi 	AUX_REGISTER_2, SERVO_X_POSITION ; Cargo en el registro auxiliar el valor actual del servo
+	mov 	AUX_REGISTER_2, SERVO_X_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_upper_limit
 	cpi 	AUX_REGISTER, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
 	breq 	end_increase_x_position
@@ -174,7 +174,7 @@ end_increase_x_position:
 ;	
 ;*************************************************************************************
 decrease_x_position:
-	ldi 	AUX_REGISTER_2, SERVO_X_POSITION ; Cargo en el registro auxiliar el valor actual del servo
+	mov 	AUX_REGISTER_2, SERVO_X_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_lower_limit
 	cpi 	AUX_REGISTER, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
 	breq 	end_decrease_x_position
@@ -192,7 +192,7 @@ end_decrease_x_position:
 ;	
 ;*************************************************************************************
 increase_y_position:
-	ldi 	AUX_REGISTER_2, SERVO_Y_POSITION ; Cargo en el registro auxiliar el valor actual del servo
+	mov 	AUX_REGISTER_2, SERVO_Y_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_upper_limit
 	cpi 	AUX_REGISTER, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
 	breq 	end_increase_y_position
@@ -211,7 +211,7 @@ end_increase_y_position:
 ;	
 ;*************************************************************************************
 decrease_y_position:
-	ldi 	AUX_REGISTER_2, SERVO_Y_POSITION ; Cargo en el registro auxiliar el valor actual del servo
+	mov 	AUX_REGISTER_2, SERVO_Y_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_lower_limit
 	cpi 	AUX_REGISTER, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
 	breq 	end_decrease_y_position
@@ -294,9 +294,7 @@ set_OCR1B:
 ;*************************************************************************************
 configure_ports:
 	ldi 	AUX_REGISTER, 0x00 				; Cargo el registro R16 con 0x00
-	out 	SWITCHES_DIR, AUX_REGISTER 		; Cargo un cero en todos los bits del DDRD
-	out 	SWITCHES_PORT, AUX_REGISTER		; Cargo un cero en todos los bits del PORTD
-	out 	SERVO_DIR, AUX_REGISTER 		; Cargo un cero en todos los bits del DDRB
+	out 	SERVOS_DIR, AUX_REGISTER 		; Cargo un cero en todos los bits del DDRB
 	sbi 	SERVOS_DIR, SERVO_X_PIN_NUM  	; Configuro el pin del servo X como output
 	sbi 	SERVOS_DIR, SERVO_Y_PIN_NUM  	; Configuro el pin del servo Y como output 
 
@@ -879,4 +877,4 @@ end_handle_adc_conversion:
 //Tabla con el mensaje "Envíe R para pasar a control por modo remoto" en ASCII
 MSJ: .DB 69, 110, 118, 195, 173, 101, 32, 82, 32, 112, 97, 114, 97, 32, \
 112, 97, 115, 97, 114, 32, 97, 32, 99, 111, 110, 116, 114, 111, 108, 32, 112, \
-111, 114, 32, 109, 111, 100, 111, 32, 114, 101, 109, 111, 116, 111
+111, 114, 32, 109, 111, 100, 111, 32, 114, 101, 109, 111, 116, 111, 0
