@@ -415,23 +415,29 @@ disable_adc:
 isr_dato_recibido_usart:
 	//guardo el registro de estado
     in r24, SREG
+	push r24
 
 	//cargo en r16 el dato recibido
     lds r16, UDR0
 
-	//independientemente del modo en el que este, con r siempre se cambia de modo
+	//primero chequeo en que modo estoy
+	mov AUX_REGISTER, mode
+	cpi AUX_REGISTER, REMOTE
+	breq isr_remote_mode 
+
+isr_manual_mode:
+	//en caso de estar en modo manual
+	//solo me importa si llega una 'r' para cambiar de modo
 	cpi r16, 'r'
 	breq isr_change_mode
 
-	//si estoy en modo remoto y no se presiono r no hay nada para hacer
-	mov AUX_REGISTER, mode
-	cpi AUX_REGISTER, REMOTE
-	breq fin_int_recibido
-
-isr_manual_mode: 
+isr_remote_mode: 
 
 	//chequeo que tecla se presiono
 	//y en base a eso muevo, cambio el modo o salgo
+	cpi r16, 'm'
+	breq isr_change_mode
+
 	cpi r16, 'd'
 	breq isr_move_right
 
@@ -467,6 +473,7 @@ isr_change_mode:
 fin_int_recibido:
 	//restauro el registro de estado
     out SREG, r24
+	pop r24
     reti
 
 ;*************************************************************************************
@@ -477,7 +484,7 @@ USART_Init:
 	push r16
 	push r17
 
-	;setear el baud rate
+	;setear el baud rate en 9600
 	ldi r16, 103
 	ldi r17, 0
 	sts UBRR0H, r17
@@ -544,7 +551,6 @@ show_init_msg:
 	ldi r18, 45
 
 loop_show:
-	rcall delay50ms
 	//guarda el dato leido en r16
 	//para que luego sea transmitido por USART_Transmit
 	lpm	r16,z+
@@ -556,32 +562,6 @@ loop_show:
 	pop r16
 	ret
 
-;*************************************************************************************
-; Subrutina para esperar 50ms
-;
-;*************************************************************************************
-
-delay50ms:
-	push r19
-	push r18
-	push r17
-	ldi r19, 4
-loop0:
-	ldi r18, 201
-loop1:
-	ldi r17, 248
-loop2:
-	nop
-	dec r17
-	brne loop2
-	dec r18
-	brne loop1
-	dec r19
-	brne loop0
-	pop r17
-	pop r18
-	pop r19
-	ret
 
 //len = 45
 //Tabla con el mensaje "Envíe R para pasar a control por modo remoto" en ASCII
