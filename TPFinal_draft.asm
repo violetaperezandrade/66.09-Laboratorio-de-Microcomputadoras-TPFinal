@@ -28,7 +28,6 @@
 .equ 	ADC_X_PIN_NUM 		= 0
 .equ 	ADC_Y_PIN_NUM 		= 1
 .equ 	ADC_PORT 			= PORTC
-.equ 	ADC_PIN 			= PINC
 .equ 	ADC_DIR 			= DDRC
 
 .equ 	CLR_CLOCK_SELECTOR 	= 0xF8 	; Mascara para setear en cero el Clock Selector de un timer
@@ -41,14 +40,14 @@
 .equ 	MANUAL 				= 0 	; Valor para indicar que se encuentra en modo manual
 .equ 	CLEAR_CHANNEL 		= 0xF8 	; Valor para borrar el channel seleccionado en el ADC
 
-// Los switches pasan a ser cosas del teclado ahora
 .def 	MODE 				= r1 	; Registro que guarda el modo en el cual se encuentra el programa
-.def 	ADC_HIGH 			= r2  	; Registro donde se guardara el HIGH byte de la conversion de ADC
-.def 	ADC_LOW 			= r3  	; Registro donde se guardara el LOW byte de la conversion de ADC
-.def 	MAPPED_VALUE  		= r4 	; Registro donde se guardar el resultado de hacer un mapeo del valor del ADC en la funcion map_value
-.def 	FLAG 				= r5 	; Registro que sera utilizado como flag
-.def 	SERVO_X_POSITION	= r22 	; Registro que contendra el valor en el que se encuentra el servo X (Low byte)
-.def 	SERVO_Y_POSITION	= r23 	; Registro que contendra el valor en el que se encuentra el servo Y (Low byte)
+.def 	MAPPED_VALUE  		= r2 	; Registro donde se guardar el resultado de hacer un mapeo del valor del ADC en la funcion map_value
+.def 	FLAG 				= r3 	; Registro que sera utilizado como flag
+.def 	FLAG_CONVERT_X 		= r4 	; Registro para saber que canal del ADC convertir. X = 1, Y = 0
+.def 	ADC_HIGH 			= r19  	; Registro donde se guardara el HIGH byte de la conversion de ADC
+.def 	ADC_LOW 			= r20  	; Registro donde se guardara el LOW byte de la conversion de ADC
+.def 	SERVO_X_POSITION	= r21 	; Registro que contendra el valor en el que se encuentra el servo X (Low byte)
+.def 	SERVO_Y_POSITION	= r22 	; Registro que contendra el valor en el que se encuentra el servo Y (Low byte)
 .def	AUX_REGISTER		= r23	; Registro auxiliar para multiples propositos
 .def 	AUX_REGISTER_2 		= r24 	; Registro auxiliar para multiples propositos
 .def 	AUX_REGISTER_3 		= r25	; Registro auxiliar para multiples propositos
@@ -76,17 +75,24 @@ start:
 
 	; Realizo las configuraciones iniciales
 	rcall	configure_ports		; Configuro los puertos
-	rcall	configure_timers	; Configuro el WGM de los timers
-	sei		; Habilito las interrupciones
+	rcall	configure_timer_1	; Configuro el WGM de los timers
+	rcall 	configure_adc 		; Configuro el ADC
+	rcall	USART_Init			; Configuro el puerto serie
+
+	clr 	FLAG_CONVERT_X ; Limpio el registro para asegurarme de que este en cero
+	inc 	FLAG_CONVERT_X ; Cargo un 1 dado que siempre convierto primero X
+	
+	rcall 	set_default_position_servos
 	rcall show_init_msg ;mostrar mensaje inicial
 
-main_loop:
-	rjmp	main_loop
+	rcall 	initialize_timer1 	; Inicializo el timer encargado de mover el servo
+	rcall 	adc_start_conversion
+	sei		; Habilito las interrupciones
 
-// ToDo: las siguientes funciones cambiar para las teclas, creo que en modo REMOTO las teclas
-// deberian funcionar de manera similar a los switches, CREO 
 // REMOTO === TECLADO
 // MANUAL === JOYSTCIK
+main_loop:
+	rjmp	main_loop
 
 ;*************************************************************************************
 ; Subrutina que cambia el modo en el que se encuentra el programa.
@@ -118,7 +124,7 @@ set_manual_mode:
 	push 	AUX_REGISTER
 	ldi 	AUX_REGISTER, MANUAL
 	mov 	MODE, AUX_REGISTER ; Mode = MANUAL
-	rcall 	enable_adc
+	rcall 	enable_adc ; Habilitamos nuevamente las conversiones del ADC
 	pop 	AUX_REGISTER
 	ret
 
@@ -129,7 +135,7 @@ set_manual_mode:
 set_remote_mode:
 	ldi 	AUX_REGISTER, REMOTE
 	mov 	MODE, AUX_REGISTER ; Mode = REMOTE
-	rcall 	disable_adc
+	rcall 	disable_adc ; Dejamos de hacer las conversiones del ADC
 	ret
 
 ;*************************************************************************************
@@ -266,7 +272,6 @@ set_OCR1A:
 ; contenido que tenga el registro SERVO_Y_POSITION
 ;
 ;*************************************************************************************
-
 set_OCR1B:
 	// Primero escribo el high byte y luego el low
 	push 	AUX_REGISTER
@@ -280,30 +285,24 @@ set_OCR1B:
 ; Se configuran los puertos del microcontrolador como entrada/salida
 ;
 ; En este caso la configuracion es la siguiente:
-; + Switch 1: se configura como entrada 
-; + Switch 2: se configura como entrada
-; + Servo: se configura como output
+; + Servo X: se configura como output 
+; + Servo Y: se configura como output
+; + ADC X: se configura como input
+; + ADC Y: se configura como input
 ;	
 ;*************************************************************************************
-
 configure_ports:
 	ldi 	AUX_REGISTER, 0x00 				; Cargo el registro R16 con 0x00
 	out 	SWITCHES_DIR, AUX_REGISTER 		; Cargo un cero en todos los bits del DDRD
 	out 	SWITCHES_PORT, AUX_REGISTER		; Cargo un cero en todos los bits del PORTD
 	out 	SERVO_DIR, AUX_REGISTER 		; Cargo un cero en todos los bits del DDRB
 	sbi 	SERVOS_DIR, SERVO_X_PIN_NUM  	; Configuro el pin del servo X como output
-	sbi 	SERVOS_DIR, SERVO_Y_PIN_NUM  	; Configuro el pin del servo Y como output 	
+	sbi 	SERVOS_DIR, SERVO_Y_PIN_NUM  	; Configuro el pin del servo Y como output 
 
-	sbi 	SWITCHES_PORT, SWITCH_1_PIN_NUM ; Activo la resistencia de Pull-up del pulsador 1, PORTD2 = 1
-	sbi 	SWITCHES_PORT, SWITCH_2_PIN_NUM ; Activo la resistencia de Pull-up del pulsador 2, PORTD3 = 1
-	ret
-
-;*************************************************************************************
-; Subrutina que configura los timers 0, 1 y 2
-;	
-;*************************************************************************************
-configure_timers:
-	rcall configure_timer_1
+	// ADC
+	out 	ADC_DIR, AUX_REGISTER 			; Cargo un cero en todos los bits del DDRC, seran inputs
+	cbi 	ADC_PORT, ADC_X_PIN_NUM  		; Desactivo la resistencia de Pull-up, PORTC0 = 1
+	cbi 	ADC_PORT, ADC_Y_PIN_NUM			; Desactivo la resistencia de Pull-up, PORTC1 = 0
 	ret
 
 ;*************************************************************************************
@@ -320,16 +319,19 @@ configure_timers:
 ; Compare Output Mode:
 ; + COM1A1: 1
 ; + COM1A0: 0
+;
+; + COM1B1: 1
+; + COM1B0: 0
+;
 ;*************************************************************************************	
-
 configure_timer_1:
 	// Configuro TCCR1A
 	push 	AUX_REGISTER
 	clr 	AUX_REGISTER ; Limpio el registro
 	lds 	AUX_REGISTER, TCCR1A ; AUX_REGISTER = TCCR1A
-	andi 	AUX_REGISTER, 0xFC ; Realizo un AND con 0x3C = 0011 1100
+	andi 	AUX_REGISTER, 0x0C ; Realizo un AND con 0x3C = 0000 1100
 	ori 	AUX_REGISTER, (1 << WGM11) ; Realizo un OR para configurar el WGM
-	ori 	AUX_REGISTER, (1 << COM1A1) ; Realizo un OR para configurar el Compare Output Mode
+	ori 	AUX_REGISTER, (1 << COM1A1) | (1 << COM1B1) ; Realizo un OR para configurar el Compare Output Mode
 	sts 	TCCR1A, AUX_REGISTER ; Paso el contenido del AUX_REGISTER a TCCR1A
 
 	// Configuro TCCR1B
@@ -373,6 +375,108 @@ initialize_timer1:
 	ret
 
 ;*************************************************************************************
+; Subrutina que configura los registros ADCSRA y ADMUX del ADC
+;
+;*************************************************************************************
+configure_adc:
+	rcall 	configure_ADCSRA_register
+	rcall 	configure_ADMUX_register
+	ret
+
+;*************************************************************************************
+; Subrutina que configura el ADCSRA Register del ADC
+;
+; ADC Enable: true
+; + ADEN = 1
+;
+; ADC Interrupt Enable: true
+; + ADIE = 1
+;
+; ADC Prescaler: 128
+; + ADPS2 = 1
+; + ADPS1 = 1
+; + ADPS0 = 1
+;*************************************************************************************
+configure_ADCSRA_register:
+	push 	AUX_REGISTER
+	clr		AUX_REGISTER
+	lds		AUX_REGISTER, ADCSRA ; AUX_REGISTER = ADCSRA
+	andi	AUX_REGISTER, 0x70 ; Realizo un AND con 0111 0000 para limpiar los bits a configurar
+	ori		AUX_REGISTER, (1 << ADEN) | (1 << ADIE) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0)
+	sts		ADCSRA, AUX_REGISTER ; Cargo la configuracion en ADCSRA
+	pop 	AUX_REGISTER
+	ret
+
+;*************************************************************************************
+; Subrutina que configura el ADMUX Register del ADC
+;
+; Voltage Reference: internal VCC
+; + REFS1: 0
+; + REFS0: 1
+;
+; ADC Left Adjust Results: Right adjusted
+; + ADLAR = 0 
+;
+; Analog Channel: ADC 0 (por default arrancamos convirtiendo este canal)
+; + MUX3:0 = 0
+;*************************************************************************************
+configure_ADMUX_register:
+	push 	AUX_REGISTER
+	clr		AUX_REGISTER
+	lds		AUX_REGISTER, ADMUX ; AUX_REGISTER = ADMUX
+	andi	AUX_REGISTER, 0x10 ; Realizo un AND con 0001 0000 para limpiar los bits a configurar
+	ori		AUX_REGISTER, (0 << REFS1) | (1 << REFS0)
+	sts		ADMUX, AUX_REGISTER ; Cargo la configuracion en ADMUX
+	pop 	AUX_REGISTER
+	ret
+
+;*************************************************************************************
+; Subrutina que setea el channel 0 del ADC
+;
+; Analog Channel:
+; + MUX2::0 = 000 = ADC0
+;*************************************************************************************
+set_channel_0:
+	push 	AUX_REGISTER
+	clr 	AUX_REGISTER
+	lds 	AUX_REGISTER, ADMUX ; AUX_REGISTER = ADMUX
+	andi 	AUX_REGISTER, CLEAR_CHANNEL ; Realizo un AND con 1111 1000 
+	sts 	ADMUX, AUX_REGISTER
+	pop 	AUX_REGISTER
+	ret
+
+;*************************************************************************************
+; Subrutina que setea el channel 1 del ADC
+;
+; Analog Channel: ToDo: deberia configurarse ambos o no se
+; + MUX3::0 = 0001 = ADC1
+;*************************************************************************************
+set_channel_1:
+	push 	AUX_REGISTER
+	clr 	AUX_REGISTER
+	lds 	AUX_REGISTER, ADMUX ; AUX_REGISTER = ADMUX
+	andi 	AUX_REGISTER, CLEAR_CHANNEL ; Realizo un AND con 1111 1000
+	ori 	AUX_REGISTER, (1 << MUX0) ; Pongo en 1 el bit de MUX0
+	sts 	ADMUX, AUX_REGISTER
+	pop  	AUX_REGISTER
+	ret
+
+;*************************************************************************************
+; Subrutina que activa la conversion del ADC
+; + ADSC = 1
+;
+;*************************************************************************************
+adc_start_conversion:
+	push 	AUX_REGISTER
+	clr		AUX_REGISTER
+	lds		AUX_REGISTER, ADCSRA ; AUX_REGISTER = ADCSRA
+	andi	AUX_REGISTER, 0xBF ; Realizo un AND con 1011 1111 para limpiar el bit a configurar
+	ori		AUX_REGISTER, (1 << ADSC)
+	sts		ADCSRA, AUX_REGISTER ; Cargo la configuracion en ADCSRA
+	pop 	AUX_REGISTER
+	ret
+
+;*************************************************************************************
 ; Subrutina que habilita el ADC
 ; + ADEN = 1
 ;
@@ -400,7 +504,162 @@ disable_adc:
 	pop  	AUX_REGISTER
 	ret
 
+;*************************************************************************************
+; Subrutina que chequea si el valor del ADC es mayor a 512
+; Si es verdad, FLAG contiene un 1, 0 en caso contrario
+;
+;*************************************************************************************
+greater_than_512:
+	// 513 = 0x0201
+	push 	AUX_REGISTER
+	clr 	FLAG ; Limpio el registro
+	cpi 	ADC_HIGH, 0x02 ; Comparo con el valor del high byte
+	breq	keep_checking ; Su parte alta coincide, la baja si o si tiene que ser mayor o igual, sino es menor
+	brlo 	end_greater_than_512 ; Si su parte alta es menor ya sabemos que es menor a 512
+	// Si llego aca si o si es mayor a 512
+	rjmp 	is_greater
 
+keep_checking:
+	cpi 	ADC_LOW, 0x01
+	brlo 	end_greater_than_512 ; Si es menor, no hay forma de que sea mas grande
+
+is_greater:
+	inc 	FLAG ; Cargo un 1 para indicar que es mayor
+
+end_greater_than_512:
+	pop 	AUX_REGISTER
+	ret
+
+;*************************************************************************************
+; Subrutina que le resta 512 al valor del ADC
+; Los nuevos valores de los bytes del ADC se mantienen en ADC_HIGH y ADC_LOW
+;
+;*************************************************************************************
+subtract_512_to_ADC:
+	push 	AUX_REGISTER
+	push 	AUX_REGISTER_2
+	// 512 = 0x0200 
+	ldi 	AUX_REGISTER, 0x00 // Cargo el low byte de 512
+	ldi 	AUX_REGISTER_2, 0x02 // Cargo el high byte de 512
+	// Resto los low bytes
+	sub 	ADC_LOW, AUX_REGISTER // ADC_LOW = ADC_LOW - AUX_REGISTER
+	// Resto los high bytes
+	sbc 	ADC_HIGH, AUX_REGISTER_2 // ADC_HIGH = ADC_HIGH - AUX_REGISTER_2
+	pop 	AUX_REGISTER_2
+	pop 	AUX_REGISTER
+	ret
+
+;*************************************************************************************
+; Subrutina que mapea el valor del ADC a un valor entre los limites del servo motor.
+; El valor leido del ADC se encuentra en el rango [0, 1024].
+; El valor a convertir es de 16 bits.
+; f(x) --> C, C E [35, 255], x E [0, 1024]
+;
+; f1(x) = [(x * 120) / 1024] + 35, si x E [0, 512]
+; f2(x) = [(x * 120) / 1024] + 95, si x E [513, 1024]
+;
+; El resultado se guarda en MAPPED_VALUE
+;*************************************************************************************
+map_value:
+	push 	AUX_REGISTER
+	push 	AUX_REGISTER_2
+	push 	AUX_REGISTER_3
+
+	rcall 	greater_than_512 // Chequeo si es mayor a 512
+	push 	FLAG // Pusheo el valor dado que al final lo necesito
+	mov		AUX_REGISTER, FLAG
+	cpi 	AUX_REGISTER, 1 // Si es igual a 1 significa que es mayor
+	brne 	start_mapping // Comienzo a mapear
+	
+	// Antes de mapear debo restarle 512 al valor, sino la multiplicacion dara overflow
+	rcall 	subtract_512_to_ADC
+
+start_mapping:
+	// 120 * x = 128 * x - 8 * x
+
+	// 128 * x = Shift Left 7 veces
+	mov 	AUX_REGISTER, ADC_LOW
+	mov 	AUX_REGISTER_2, ADC_HIGH // Copio los valores del ADC en los registros
+
+	lsr 	AUX_REGISTER // Shifteo una vez hacia la derecha
+
+	// Shifteo 7 veces hacia la izquierda el HIGH BYTE
+	ldi 	AUX_REGISTER_3, 0x00 ; Se usara como contador para el loop
+loop_shift_7_times:
+	lsl 	AUX_REGISTER_2
+	inc 	AUX_REGISTER_3
+	cpi 	AUX_REGISTER_3, 7
+	brne 	loop_shift_7_times
+
+	// El high byte se obtiene con un OR entre AUX_REGISTER y AUX_REGISTER 2
+	or 		AUX_REGISTER, AUX_REGISTER_2 // AUX_REGISTER = AUX_REGISTER OR AUX_REGISTER_2
+	push 	AUX_REGISTER // Guardo el valor en el stack ya que reutilizare estos registros a continuacion
+
+	// Solo me interesa el HIGH byte de estas operaciones, ya que al dividir por 1024
+	// hay que shiftear 10 veces hacia la derecha, por lo que el LOW byte y los 2 bits
+	// menos significativos del high byte se 'pierden'
+
+	// 8 * x = Shift Left 3 veces
+	mov 	AUX_REGISTER, ADC_LOW
+	mov 	AUX_REGISTER_2, ADC_HIGH // Copio los valores del ADC en los registros
+
+	// Shifteo 3 veces hacia la izquierda el HIGH byte
+	clr 	AUX_REGISTER_3
+loop_shift_3_times:
+	lsl 	AUX_REGISTER_2
+	inc 	AUX_REGISTER_3
+	cpi 	AUX_REGISTER_3, 3
+	brne 	loop_shift_3_times
+
+	// Shifteo 5 veces el LOW byte hacia la derecha
+	clr 	AUX_REGISTER_3
+loop_shift_5_times:
+	lsr 	AUX_REGISTER
+	inc 	AUX_REGISTER_3
+	cpi 	AUX_REGISTER_3, 5
+	brne 	loop_shift_5_times
+
+	or 		AUX_REGISTER_2, AUX_REGISTER // AUX_REGISTER_2 = AUX_REGISTER_2 OR AUX_REGISTER
+
+	// En este punto ya tengo 8x, recupero del stack 128x
+	pop 	AUX_REGISTER // AUX_REGISTER tiene el valor de 128*x
+
+	// Realizo 128x - 8x. Recordar, solo nos interesa el high byte, por lo tanto no trabajamos con 16 bits
+	// sino con 8 bits. por lo que los valores estan entre 0 y 255. Al ser 128x > 8x siempre sera positivo
+	// o cero el resultado
+	sub 	AUX_REGISTER, AUX_REGISTER_2 // AUX_REGISTER = AUX_REGISTER - AUX_REGISTER_2 = 128x - 8x = 120x
+
+	// value / 1024 = Shiftear 10 veces hacia la derecha
+	// pero como value representa al high byte, shiftear 10 veces hacia la derecha es equivalente a shiftear
+	// solo dos veces el valor que tenemos en el registro
+	lsr 	AUX_REGISTER
+	lsr 	AUX_REGISTER
+	// Aca tenemos AUX_REGISTER = (Value * 120) / 1024
+
+	pop 	FLAG // Recupero el valor de si es mayor a 512 dado que las funciones varian
+	mov		AUX_REGISTER_2, FLAG // AUX_REGISTER_2 = FLAG
+	cpi 	AUX_REGISTER_2, 0x01 // Si son iguales estoy en el caso de f2(x), en caso contrario es f1(x)
+	breq 	add_95
+
+	// Sumamos 35
+	ldi 	AUX_REGISTER_2, LOWER_LIMIT
+	add 	AUX_REGISTER, AUX_REGISTER_2 //AUX_REGISTER = AUX_REGISTER + 35 = f1(x)
+	rjmp 	end_mapping
+
+add_95:
+	ldi 	AUX_REGISTER_2, 0x5F ; Cargo un 95
+	add 	AUX_REGISTER, AUX_REGISTER_2 //AUX_REGISTER = AUX_REGISTER + 95 = f2(x)
+
+end_mapping:
+	cpi 	AUX_REGISTER, 0x9C ; Comparo el valor mapeado con 156
+	brlo	set_mapped_value ; La conversion dio un numero menor al limite del servo
+	ldi 	AUX_REGISTER, 0x9B ; Seteo forzosamente el 155 para no pasarme del limite
+set_mapped_value:
+	mov 	MAPPED_VALUE, AUX_REGISTER
+	pop  	AUX_REGISTER_3
+	pop  	AUX_REGISTER_2
+	pop  	AUX_REGISTER
+	ret
 
 ;*************************************************************************************
 ; Subrutinas de USART
