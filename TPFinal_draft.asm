@@ -77,6 +77,7 @@ start:
 	; Realizo las configuraciones iniciales
 	rcall	configure_ports		; Configuro los puertos
 	rcall	configure_timers	; Configuro el WGM de los timers
+	rcall	configurar_interrupciones ;Configurar interrupciones
 	sei		; Habilito las interrupciones
 	rcall show_init_msg ;mostrar mensaje inicial
 
@@ -408,6 +409,18 @@ disable_adc:
 ;*************************************************************************************
 
 ; ***************************** INTERRUPT HANDLER ***********************************
+
+;*************************************************************************************
+; Subrutina para configurar la interrupcion por entrada del teclado
+;
+;*************************************************************************************
+configurar_interrupciones:
+    ; Activar interrupción por recepción de datos
+    lds r16, UCSR0B
+    ori r16, (1 << RXCIE0) 
+    sts UCSR0B, r16
+    ret
+
 ;*************************************************************************************
 ; Subrutina para manejar la interrupcion por entrada del teclado
 ;
