@@ -77,7 +77,8 @@ start:
 	rcall	configure_ports		; Configuro los puertos
 	rcall	configure_timer_1	; Configuro el WGM de los timers
 	rcall 	configure_adc 		; Configuro el ADC
-	rcall	USART_Init			; Configuro el puerto serie
+	rcall	configure_usart_interrupt ; Configurar interrupciones del teclado
+	rcall	USART_Init			; Inicializo el USART
 
 	clr 	FLAG_CONVERT_X ; Limpio el registro para asegurarme de que este en cero
 	inc 	FLAG_CONVERT_X ; Cargo un 1 dado que siempre convierto primero X
@@ -350,6 +351,17 @@ configure_timer_1:
 
 	pop 	AUX_REGISTER
 	ret
+
+;*************************************************************************************
+; Subrutina para configurar la interrupcion por entrada del teclado
+;
+;*************************************************************************************
+configure_usart_interrupt:
+    ; Activar interrupción por recepción de datos
+    lds r16, UCSR0B
+    ori r16, (1 << RXCIE0) 
+    sts UCSR0B, r16
+    ret
 
 ;*************************************************************************************
 ; Subrutina que inicializa el Timer 1
@@ -666,75 +678,6 @@ set_mapped_value:
 ;
 ;*************************************************************************************
 
-; ***************************** INTERRUPT HANDLER ***********************************
-;*************************************************************************************
-; Subrutina para manejar la interrupcion por entrada del teclado
-;
-;*************************************************************************************
-isr_dato_recibido_usart:
-	//guardo el registro de estado
-    in r24, SREG
-	push r24
-
-	//cargo en r16 el dato recibido
-    lds r16, UDR0
-
-	//primero chequeo en que modo estoy
-	mov AUX_REGISTER, mode
-	cpi AUX_REGISTER, REMOTE
-	breq isr_remote_mode 
-
-isr_manual_mode:
-	//en caso de estar en modo manual
-	//solo me importa si llega una 'r' para cambiar de modo
-	cpi r16, 'r'
-	breq isr_change_mode
-
-isr_remote_mode: 
-
-	//chequeo que tecla se presiono
-	//y en base a eso muevo, cambio el modo o salgo
-	cpi r16, 'm'
-	breq isr_change_mode
-
-	cpi r16, 'd'
-	breq isr_move_right
-
-	cpi r16, 'a'
-	breq isr_move_left
-
-	cpi r16, 'w'
-	breq isr_move_up
-
-	cpi r16, 's'
-	breq isr_move_down
-	rjmp fin_int_recibido
-
-isr_move_right:
-	rcall increase_x_position
-	rjmp fin_int_recibido
-
-isr_move_left:
-	rcall decrease_x_position
-	rjmp fin_int_recibido
-
-isr_move_up:
-	rcall increase_y_position
-	rjmp fin_int_recibido
-
-isr_move_down:
-	rcall decrease_y_position
-	rjmp fin_int_recibido
-
-isr_change_mode:
-	rcall change_mode
-
-fin_int_recibido:
-	//restauro el registro de estado
-    out SREG, r24
-	pop r24
-    reti
-
 ;*************************************************************************************
 ; Subrutina que seta la configuración incial de USART
 ; 
@@ -821,6 +764,116 @@ loop_show:
 	pop r16
 	ret
 
+
+; ***************************** INTERRUPTS HANDLER ***********************************
+
+;*************************************************************************************
+; Subrutina para manejar la interrupcion por entrada del teclado
+;
+;*************************************************************************************
+isr_dato_recibido_usart:
+	//guardo el registro de estado
+    in r24, SREG
+	push r24
+
+	//cargo en r16 el dato recibido
+    lds r16, UDR0
+
+	//primero chequeo en que modo estoy
+	mov AUX_REGISTER, mode
+	cpi AUX_REGISTER, REMOTE
+	breq isr_remote_mode 
+
+isr_manual_mode:
+	//en caso de estar en modo manual
+	//solo me importa si llega una 'r' para cambiar de modo
+	cpi r16, 'r'
+	breq isr_change_mode
+
+isr_remote_mode: 
+
+	//chequeo que tecla se presiono
+	//y en base a eso muevo, cambio el modo o salgo
+	cpi r16, 'm'
+	breq isr_change_mode
+
+	cpi r16, 'd'
+	breq isr_move_right
+
+	cpi r16, 'a'
+	breq isr_move_left
+
+	cpi r16, 'w'
+	breq isr_move_up
+
+	cpi r16, 's'
+	breq isr_move_down
+	rjmp fin_int_recibido
+
+isr_move_right:
+	rcall increase_x_position
+	rjmp fin_int_recibido
+
+isr_move_left:
+	rcall decrease_x_position
+	rjmp fin_int_recibido
+
+isr_move_up:
+	rcall increase_y_position
+	rjmp fin_int_recibido
+
+isr_move_down:
+	rcall decrease_y_position
+	rjmp fin_int_recibido
+
+isr_change_mode:
+	rcall change_mode
+
+fin_int_recibido:
+	//restauro el registro de estado
+    out SREG, r24
+	pop r24
+    reti
+
+;*************************************************************************************
+; Handler del ADC cuando finaliza la conversion
+;
+;*************************************************************************************
+handle_adc_conversion:
+	; Guardo en el stack los siguientes valores de los registros
+	push 	AUX_REGISTER
+	in	 	AUX_REGISTER, SREG
+	push 	AUX_REGISTER
+
+	lds 	ADC_LOW, ADCL ; Cargo el contenido de ADCL en el registro
+	lds 	ADC_HIGH, ADCH ; Cargo el contenido de ADCH en el registro
+	rcall 	map_value ; Mapeo el valor al rango [35, 155]
+	ldi 	AUX_REGISTER, 0x01
+	cp 		FLAG_CONVERT_X, AUX_REGISTER ; Veo que canal debo analizar para actualizar la posicion del servo
+	brne	conversion_y
+
+	// Conversion de X
+	mov 	SERVO_X_POSITION, MAPPED_VALUE ; Actualizo la posicion del servo en X
+	rcall 	set_OCR1A
+	rcall 	set_channel_1 ; Cambio de channel para actualizar la posicion en Y
+	rcall 	adc_start_conversion ; Comienzo la conversion de ADC1
+	clr 	FLAG_CONVERT_X ; Limpio el registro, ahora analizo y convierto Y
+	rjmp 	end_handle_adc_conversion
+
+conversion_y:
+	mov 	SERVO_Y_POSITION, MAPPED_VALUE ; Actualizo la posicion del servo en Y
+	rcall 	set_OCR1B
+	rcall 	set_channel_0 ; Cambio al channel 0 nuevamente
+	rcall 	adc_start_conversion
+	ldi 	AUX_REGISTER, 0x01
+	mov 	FLAG_CONVERT_X, AUX_REGISTER ; Cargo un 1 para que la proxima conversion sea de X
+
+end_handle_adc_conversion:
+	; Recupero los valores de los registros
+	pop 	AUX_REGISTER
+	out 	SREG, AUX_REGISTER
+	pop 	AUX_REGISTER
+	reti
 
 //len = 45
 //Tabla con el mensaje "Envíe R para pasar a control por modo remoto" en ASCII
