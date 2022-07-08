@@ -58,7 +58,10 @@
 	rjmp start
 
 .org ADCCaddr
-	rjmo 	handle_adc_conversion
+	rjmp 	handle_adc_conversion
+
+.org URXCaddr
+    jmp isr_dato_recibido_usart
 
 .org INT_VECTORS_SIZE
 
@@ -74,24 +77,10 @@ start:
 	; Realizo las configuraciones iniciales
 	rcall	configure_ports		; Configuro los puertos
 	rcall	configure_timers	; Configuro el WGM de los timers
-	rcall	configure_int0		; Configuro la int0
-	rcall	configure_int1		; Configuro la int1
-
-	; Habilito las interrupciones
-	rcall	enable_int0
-	rcall	enable_int1
-	rcall 	enable_timers_interrupts
-
-	clr		DEBOUNCE_1_FINISHED ; Limpio los registros para que comiencen en cero
-	clr		DEBOUNCE_2_FINISHED
-	rcall 	initialize_timer1 ; Inicializo el timer encargado de mover el servo
 	sei		; Habilito las interrupciones
+	rcall show_init_msg ;mostrar mensaje inicial
 
 main_loop:
-	sbrc 	DEBOUNCE_1_FINISHED, 0 ; Si el valor del primer bit menos significativo es cero, salteo la siguiente instruccion
-	rcall 	check_switch_1
-	sbrc 	DEBOUNCE_2_FINISHED, 0 
-	rcall 	check_switch_2
 	rjmp	main_loop
 
 // ToDo: las siguientes funciones cambiar para las teclas, creo que en modo REMOTO las teclas
@@ -412,5 +401,170 @@ disable_adc:
 	ret
 
 
-; ***************************** INTERRUPT HANDLERS ***********************************
 
+;*************************************************************************************
+; Subrutinas de USART
+;
+;*************************************************************************************
+
+; ***************************** INTERRUPT HANDLER ***********************************
+;*************************************************************************************
+; Subrutina para manejar la interrupcion por entrada del teclado
+;
+;*************************************************************************************
+isr_dato_recibido_usart:
+	//guardo el registro de estado
+    in r24, SREG
+	push r24
+
+	//cargo en r16 el dato recibido
+    lds r16, UDR0
+
+	//primero chequeo en que modo estoy
+	mov AUX_REGISTER, mode
+	cpi AUX_REGISTER, REMOTE
+	breq isr_remote_mode 
+
+isr_manual_mode:
+	//en caso de estar en modo manual
+	//solo me importa si llega una 'r' para cambiar de modo
+	cpi r16, 'r'
+	breq isr_change_mode
+
+isr_remote_mode: 
+
+	//chequeo que tecla se presiono
+	//y en base a eso muevo, cambio el modo o salgo
+	cpi r16, 'm'
+	breq isr_change_mode
+
+	cpi r16, 'd'
+	breq isr_move_right
+
+	cpi r16, 'a'
+	breq isr_move_left
+
+	cpi r16, 'w'
+	breq isr_move_up
+
+	cpi r16, 's'
+	breq isr_move_down
+	rjmp fin_int_recibido
+
+isr_move_right:
+	rcall increase_x_position
+	rjmp fin_int_recibido
+
+isr_move_left:
+	rcall decrease_x_position
+	rjmp fin_int_recibido
+
+isr_move_up:
+	rcall increase_y_position
+	rjmp fin_int_recibido
+
+isr_move_down:
+	rcall decrease_y_position
+	rjmp fin_int_recibido
+
+isr_change_mode:
+	rcall change_mode
+
+fin_int_recibido:
+	//restauro el registro de estado
+    out SREG, r24
+	pop r24
+    reti
+
+;*************************************************************************************
+; Subrutina que seta la configuración incial de USART
+; 
+;*************************************************************************************
+USART_Init:
+	push r16
+	push r17
+
+	;setear el baud rate en 9600
+	ldi r16, 103
+	ldi r17, 0
+	sts UBRR0H, r17
+	sts UBRR0L, r16
+
+	; Activar recepción y tranmisión
+	ldi r16, (1<<RXEN0)|(1<<TXEN0)
+	sts UCSR0B,r16
+
+	; Setear el formato del frame: 8 bits de datos, 2 de parada
+	ldi r16, (1<<USBS0)|(3<<UCSZ00)
+	sts UCSR0C,r16
+
+	pop r17
+	pop r16
+	ret
+
+;*************************************************************************************
+; Subrutina para transmitir, transmite lo que este guardado en el registro r16
+; 
+;*************************************************************************************
+
+USART_Transmit:
+	;Esperar hasta que el buffer se vacie
+	;(bit UDRE0 en 0)
+	lds r17,UCSR0A
+	sbrs r17,UDRE0
+	rjmp USART_Transmit
+
+	;Envia al buffer lo que haya en r16
+	sts UDR0,r16
+	ret
+
+;*************************************************************************************
+; Subrutina para recibir, guarda lo recibido en r16
+; 
+;*************************************************************************************
+
+USART_Receive:
+
+	;Esperar hasta recibir un dato
+	;(registro RXC0 en 0)
+	lds r17, UCSR0A
+	sbrs r17, RXC0
+	rjmp USART_Receive
+
+	;Obtener lo recibido del buffer y guardarlo en r16
+	lds r16, UDR0
+	ret
+
+;*************************************************************************************
+; Subrutina para transmitir el mensaje inicial
+; "Envíe R para pasar a control por modo remoto"
+;*************************************************************************************
+
+show_init_msg:
+
+	push r16	
+	push r18
+	//apunta a la tabla MSG
+	ldi	zl,LOW(MSJ<<1)
+	ldi	zh,HIGH(MSJ<<1)
+	//largo de la tabla
+	ldi r18, 45
+
+loop_show:
+	//guarda el dato leido en r16
+	//para que luego sea transmitido por USART_Transmit
+	lpm	r16,z+
+	rcall USART_Transmit
+	dec r18
+	brne loop_show
+
+	pop r18
+	pop r16
+	ret
+
+
+//len = 45
+//Tabla con el mensaje "Envíe R para pasar a control por modo remoto" en ASCII
+MSJ: .DB 69, 110, 118, 195, 173, 101, 32, 82, 32, 112, 97, 114, 97, 32, \
+112, 97, 115, 97, 114, 32, 97, 32, 99, 111, 110, 116, 114, 111, 108, 32, 112, \
+111, 114, 32, 109, 111, 100, 111, 32, 114, 101, 109, 111, 116, 111
