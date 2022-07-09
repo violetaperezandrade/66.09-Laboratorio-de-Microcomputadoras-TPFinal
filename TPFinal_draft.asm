@@ -174,9 +174,9 @@ increase_x_position:
 	cpi 	SERVO_X_POSITION, UPPER_LIMIT ; Comparo para ver si no pase el limite, en caso de hacerlo seteo el UPPER_LIMIT
 	brlo 	end_increase_x_position
 	ldi 	SERVO_X_POSITION, UPPER_LIMIT ; SERVO_X_POSITION = UPPER_LIMIT
-	rcall	set_OCR1A
 
 end_increase_x_position:
+	rcall	set_OCR1A
 	pop		AUX_REGISTER_3
 	pop  	AUX_REGISTER_2
 	pop  	AUX_REGISTER
@@ -198,11 +198,11 @@ decrease_x_position:
 	// No me encuentro en el limite, actualizo la posicion
 	subi 	SERVO_X_POSITION, SERVO_STEP ; SERVO_X_POSITION = SERVO_X_POSITION - SERVO_STEP
 	cpi 	SERVO_X_POSITION, LOWER_LIMIT ; Comparo para ver si no pase el limite, en caso de hacerlo seteo el LOWER_LIMIT
-	brlo 	end_decrease_x_position
+	brsh 	end_decrease_x_position
 	ldi 	SERVO_X_POSITION, LOWER_LIMIT ; SERVO_X_POSITION = LOWER_LIMIT
-	rcall	set_OCR1A
 
 end_decrease_x_position:
+	rcall	set_OCR1A
 	pop		AUX_REGISTER_3
 	pop  	AUX_REGISTER_2
 	pop  	AUX_REGISTER
@@ -227,9 +227,9 @@ increase_y_position:
 	cpi 	SERVO_Y_POSITION, UPPER_LIMIT ; Comparo para ver si no pase el limite, en caso de hacerlo seteo el UPPER_LIMIT
 	brlo 	end_increase_y_position
 	ldi 	SERVO_Y_POSITION, UPPER_LIMIT ; SERVO_Y_POSITION = UPPER_LIMIT
-	rcall	set_OCR1B
 
 end_increase_y_position:
+	rcall	set_OCR1B
 	pop		AUX_REGISTER_3
 	pop  	AUX_REGISTER_2
 	pop  	AUX_REGISTER
@@ -251,11 +251,11 @@ decrease_y_position:
 	// No me encuentro en el limite, actualizo la posicion
 	subi 	SERVO_Y_POSITION, SERVO_STEP ; SERVO_Y_POSITION = SERVO_Y_POSITION - SERVO_STEP
 	cpi 	SERVO_Y_POSITION, LOWER_LIMIT ; Comparo para ver si no pase el limite, en caso de hacerlo seteo el LOWER_LIMIT
-	brlo 	end_decrease_y_position
+	brsh 	end_decrease_y_position
 	ldi 	SERVO_Y_POSITION, LOWER_LIMIT ; SERVO_Y_POSITION = LOWER_LIMIT
-	rcall	set_OCR1B
 
 end_decrease_y_position:
+	rcall	set_OCR1B
 	pop		AUX_REGISTER_3
 	pop  	AUX_REGISTER_2
 	pop  	AUX_REGISTER
