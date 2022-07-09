@@ -32,7 +32,7 @@
 
 .equ 	CLR_CLOCK_SELECTOR 	= 0xF8 	; Mascara para setear en cero el Clock Selector de un timer
 
-.equ 	SERVO_STEP			= 1 	; Se va a mover el OCR1A y OCR1B entre [35, 155] con un step de 1 para ir de 0 a 180 grados
+.equ 	SERVO_STEP			= 6 	; Se va a mover el OCR1A y OCR1B entre [35, 155] con un step de 1 para ir de 0 a 180 grados
 .equ 	SERVO_INITIAL_POS 	= 95 	; Posicion inicial de los servos, equivale a 90°
 .equ 	LOWER_LIMIT 		= 35 	; Limite inferior para ambos servos (OCR1A y OCR1B)
 .equ 	UPPER_LIMIT 		= 155 	; Limite superior para ambos servos (OCR1A y OCR1B)
