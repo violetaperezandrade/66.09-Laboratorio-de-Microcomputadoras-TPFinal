@@ -128,6 +128,7 @@ set_manual_mode:
 	ldi 	AUX_REGISTER, MANUAL
 	mov 	MODE, AUX_REGISTER ; Mode = MANUAL
 	rcall 	enable_adc ; Habilitamos nuevamente las conversiones del ADC
+	rcall   adc_start_conversion
 	pop 	AUX_REGISTER
 	ret
 
@@ -173,6 +174,7 @@ increase_x_position:
 	cpi 	SERVO_X_POSITION, UPPER_LIMIT ; Comparo para ver si no pase el limite, en caso de hacerlo seteo el UPPER_LIMIT
 	brlo 	end_increase_x_position
 	ldi 	SERVO_X_POSITION, UPPER_LIMIT ; SERVO_X_POSITION = UPPER_LIMIT
+	rcall	set_OCR1A
 
 end_increase_x_position:
 	pop		AUX_REGISTER_3
@@ -198,6 +200,7 @@ decrease_x_position:
 	cpi 	SERVO_X_POSITION, LOWER_LIMIT ; Comparo para ver si no pase el limite, en caso de hacerlo seteo el LOWER_LIMIT
 	brlo 	end_decrease_x_position
 	ldi 	SERVO_X_POSITION, LOWER_LIMIT ; SERVO_X_POSITION = LOWER_LIMIT
+	rcall	set_OCR1A
 
 end_decrease_x_position:
 	pop		AUX_REGISTER_3
@@ -224,6 +227,7 @@ increase_y_position:
 	cpi 	SERVO_Y_POSITION, UPPER_LIMIT ; Comparo para ver si no pase el limite, en caso de hacerlo seteo el UPPER_LIMIT
 	brlo 	end_increase_y_position
 	ldi 	SERVO_Y_POSITION, UPPER_LIMIT ; SERVO_Y_POSITION = UPPER_LIMIT
+	rcall	set_OCR1B
 
 end_increase_y_position:
 	pop		AUX_REGISTER_3
@@ -249,6 +253,7 @@ decrease_y_position:
 	cpi 	SERVO_Y_POSITION, LOWER_LIMIT ; Comparo para ver si no pase el limite, en caso de hacerlo seteo el LOWER_LIMIT
 	brlo 	end_decrease_y_position
 	ldi 	SERVO_Y_POSITION, LOWER_LIMIT ; SERVO_Y_POSITION = LOWER_LIMIT
+	rcall	set_OCR1B
 
 end_decrease_y_position:
 	pop		AUX_REGISTER_3
