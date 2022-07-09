@@ -60,7 +60,7 @@
 	rjmp 	handle_adc_conversion
 
 .org URXCaddr
-    jmp isr_dato_recibido_usart
+    rjmp isr_dato_recibido_usart
 
 .org INT_VECTORS_SIZE
 
@@ -77,9 +77,10 @@ start:
 	rcall	configure_ports		; Configuro los puertos
 	rcall	configure_timer_1	; Configuro el WGM de los timers
 	rcall 	configure_adc 		; Configuro el ADC
-	rcall	configure_usart_interrupt ; Configurar interrupciones del teclado
 	rcall	USART_Init			; Inicializo el USART
+	rcall	configure_usart_interrupt ; Configurar interrupciones del teclado
 
+	clr		MODE
 	clr 	FLAG_CONVERT_X ; Limpio el registro para asegurarme de que este en cero
 	inc 	FLAG_CONVERT_X ; Cargo un 1 dado que siempre convierto primero X
 	
@@ -93,6 +94,7 @@ start:
 // REMOTO === TECLADO
 // MANUAL === JOYSTCIK
 main_loop:
+	//rcall debug
 	rjmp	main_loop
 
 ;*************************************************************************************
@@ -320,6 +322,7 @@ configure_ports:
 	out 	ADC_DIR, AUX_REGISTER 			; Cargo un cero en todos los bits del DDRC, seran inputs
 	cbi 	ADC_PORT, ADC_X_PIN_NUM  		; Desactivo la resistencia de Pull-up, PORTC0 = 1
 	cbi 	ADC_PORT, ADC_Y_PIN_NUM			; Desactivo la resistencia de Pull-up, PORTC1 = 0
+	sbi    DDRB, DEBUG_PIN_NUM
 	ret
 
 ;*************************************************************************************
@@ -890,6 +893,11 @@ end_handle_adc_conversion:
 	out 	SREG, AUX_REGISTER
 	pop 	AUX_REGISTER
 	reti
+
+debug:
+	sbi   PORTB, DEBUG_PIN_NUM
+	rrjmp debug
+	ret
 
 //len = 45
 //Tabla con el mensaje "Envíe R para pasar a control por modo remoto" en ASCII
