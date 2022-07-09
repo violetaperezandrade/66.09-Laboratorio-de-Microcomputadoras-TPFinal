@@ -74,32 +74,6 @@ fin_int_recibido:
 ;*************************************************************************************
 
 ;*************************************************************************************
-; Subrutina que setea la configuración incial de USART
-; 
-;*************************************************************************************
-USART_Init:
-	push r16
-	push r17
-
-	;setear el baud rate en 9600
-	ldi r16, 103
-	ldi r17, 0
-	sts UBRR0H, r17
-	sts UBRR0L, r16
-
-	; Activar recepción y tranmisión
-	ldi r16, (1<<RXEN0)|(1<<TXEN0)
-	sts UCSR0B,r16
-
-	; Setear el formato del frame: 8 bits de datos, 2 de parada
-	ldi r16, (1<<USBS0)|(3<<UCSZ00)
-	sts UCSR0C,r16
-
-	pop r17
-	pop r16
-	ret
-
-;*************************************************************************************
 ; Subrutina para transmitir, transmite lo que este guardado en el registro r16
 ; 
 ;*************************************************************************************

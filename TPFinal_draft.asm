@@ -36,7 +36,7 @@
 
 .org INT_VECTORS_SIZE
 // Inlcuimos las definiciones de otros modulos
-// .include "config.asm" 	ToDo: descomentar esta linea si vamos a usar el archivo config
+.include "config.asm"
 .include "USART.asm"
 .include "ADC.asm"
 start:
@@ -290,74 +290,6 @@ set_OCR1B:
 	clr AUX_REGISTER
 	sts OCR1BH, AUX_REGISTER ; El High byte siempre es cero ya que el maximo valor que puede tomar el OCR1B es 155
 	sts OCR1BL, SERVO_Y_POSITION
-	pop 	AUX_REGISTER
-	ret
-
-;*************************************************************************************
-; Se configuran los puertos del microcontrolador como entrada/salida
-;
-; En este caso la configuracion es la siguiente:
-; + Servo X: se configura como output 
-; + Servo Y: se configura como output
-; + ADC X: se configura como input
-; + ADC Y: se configura como input
-;	
-;*************************************************************************************
-configure_ports:
-	ldi 	AUX_REGISTER, 0x00 				; Cargo el registro R16 con 0x00
-	out 	SERVOS_DIR, AUX_REGISTER 		; Cargo un cero en todos los bits del DDRB
-	sbi 	SERVOS_DIR, SERVO_X_PIN_NUM  	; Configuro el pin del servo X como output
-	sbi 	SERVOS_DIR, SERVO_Y_PIN_NUM  	; Configuro el pin del servo Y como output 
-
-	// ADC
-	out 	ADC_DIR, AUX_REGISTER 			; Cargo un cero en todos los bits del DDRC, seran inputs
-	cbi 	ADC_PORT, ADC_X_PIN_NUM  		; Desactivo la resistencia de Pull-up, PORTC0 = 0
-	cbi 	ADC_PORT, ADC_Y_PIN_NUM			; Desactivo la resistencia de Pull-up, PORTC1 = 0
-	ret
-
-;*************************************************************************************
-; Subrutina que configura el Timer 1
-;
-; Mode: PWM, Fast PWM (14)
-; + WGM13: 1
-; + WGM12: 1
-; + WGM11: 1
-; + WGM10: 0
-;
-; OCR1A initial value: 0 
-;
-; Compare Output Mode:
-; + COM1A1: 1
-; + COM1A0: 0
-;
-; + COM1B1: 1
-; + COM1B0: 0
-;
-;*************************************************************************************	
-configure_timer_1:
-	// Configuro TCCR1A
-	push 	AUX_REGISTER
-	clr 	AUX_REGISTER ; Limpio el registro
-	lds 	AUX_REGISTER, TCCR1A ; AUX_REGISTER = TCCR1A
-	andi 	AUX_REGISTER, 0x0C ; Realizo un AND con 0x3C = 0000 1100
-	ori 	AUX_REGISTER, (1 << WGM11) ; Realizo un OR para configurar el WGM
-	ori 	AUX_REGISTER, (1 << COM1A1) | (1 << COM1B1) ; Realizo un OR para configurar el Compare Output Mode
-	sts 	TCCR1A, AUX_REGISTER ; Paso el contenido del AUX_REGISTER a TCCR1A
-
-	// Configuro TCCR1B
-	clr 	AUX_REGISTER ; Limpio el registro
-	lds 	AUX_REGISTER, TCCR1B ; AUX_REGISTER = TCCR1B
-	andi 	AUX_REGISTER, 0xE3 ; Realizo un AND con 0xE3 = 1110 0111
-	ori 	AUX_REGISTER, (1 << WGM13) | (1 << WGM12) ; Realizo un OR para configurar el WGM
-	sts 	TCCR1B, AUX_REGISTER ; Paso el contenido del AUX_REGISTER a TCCR1B
-
-	// Configuro el TOP (ICR1) del Timer 1, primero escribo el high byte y luego el low
-	// ICR1H | ICR1L = 0000 0100 | 1110 0001 = 1249 (0x04E1), de esta forma el periodo es de 20ms
-	ldi		AUX_REGISTER, 0x04 ; Cargo un 4 en AUX_REGISTER
-	sts		ICR1H, AUX_REGISTER ; ICR1H = 0000 0100
-	ldi		AUX_REGISTER, 0xE1 ; Cargo 0xE1 en el registro
-	sts		ICR1L, AUX_REGISTER ; ICR1L = 1110 0001
-
 	pop 	AUX_REGISTER
 	ret
 

@@ -4,62 +4,6 @@
 ;*************************************************************************************
 
 ;*************************************************************************************
-; Subrutina que configura los registros ADCSRA y ADMUX del ADC
-;
-;*************************************************************************************
-configure_adc:
-	rcall 	configure_ADCSRA_register
-	rcall 	configure_ADMUX_register
-	ret
-
-;*************************************************************************************
-; Subrutina que configura el ADCSRA Register del ADC
-;
-; ADC Enable: true
-; + ADEN = 1
-;
-; ADC Interrupt Enable: true
-; + ADIE = 1
-;
-; ADC Prescaler: 128
-; + ADPS2 = 1
-; + ADPS1 = 1
-; + ADPS0 = 1
-;*************************************************************************************
-configure_ADCSRA_register:
-	push 	AUX_REGISTER
-	clr		AUX_REGISTER
-	lds		AUX_REGISTER, ADCSRA ; AUX_REGISTER = ADCSRA
-	andi	AUX_REGISTER, 0x70 ; Realizo un AND con 0111 0000 para limpiar los bits a configurar
-	ori		AUX_REGISTER, (1 << ADEN) | (1 << ADIE) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0)
-	sts		ADCSRA, AUX_REGISTER ; Cargo la configuracion en ADCSRA
-	pop 	AUX_REGISTER
-	ret
-
-;*************************************************************************************
-; Subrutina que configura el ADMUX Register del ADC
-;
-; Voltage Reference: internal VCC
-; + REFS1: 0
-; + REFS0: 1
-;
-; ADC Left Adjust Results: Right adjusted
-; + ADLAR = 0 
-;
-; Analog Channel: ADC 0 (por default arrancamos convirtiendo este canal)
-; + MUX3:0 = 0
-;*************************************************************************************
-configure_ADMUX_register:
-	push 	AUX_REGISTER
-	clr		AUX_REGISTER
-	lds		AUX_REGISTER, ADMUX ; AUX_REGISTER = ADMUX
-	andi	AUX_REGISTER, 0x10 ; Realizo un AND con 0001 0000 para limpiar los bits a configurar
-	ori		AUX_REGISTER, (0 << REFS1) | (1 << REFS0)
-	sts		ADMUX, AUX_REGISTER ; Cargo la configuracion en ADMUX
-	pop 	AUX_REGISTER
-	ret
-
-;*************************************************************************************
 ; Subrutina que setea el channel 0 del ADC
 ;
 ; Analog Channel:
