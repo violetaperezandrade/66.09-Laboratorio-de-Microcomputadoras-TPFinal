@@ -74,7 +74,7 @@ fin_int_recibido:
 ;*************************************************************************************
 
 ;*************************************************************************************
-; Subrutina que seta la configuración incial de USART
+; Subrutina que setea la configuración incial de USART
 ; 
 ;*************************************************************************************
 USART_Init:
@@ -158,3 +158,14 @@ loop_show:
 	pop r18
 	pop r16
 	ret
+
+;*************************************************************************************
+; Subrutina para configurar la interrupcion por entrada del teclado
+;
+;*************************************************************************************
+configure_usart_interrupt:
+    ; Activar interrupción por recepción de datos
+    lds r16, UCSR0B
+    ori r16, (1 << RXCIE0) 
+    sts UCSR0B, r16
+    ret
