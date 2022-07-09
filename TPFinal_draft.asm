@@ -896,7 +896,7 @@ end_handle_adc_conversion:
 
 debug:
 	sbi   PORTB, DEBUG_PIN_NUM
-	rrjmp debug
+	rjmp debug
 	ret
 
 //len = 45
