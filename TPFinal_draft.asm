@@ -17,40 +17,7 @@
 .dseg 	; Segmento de datos en memoria RAM
 .org 	SRAM_START
 
-; Defino los conjuntos de segmentos, pines y puertos a utilizar
-
-.equ 	SERVO_X_PIN_NUM		= 1
-.equ 	SERVO_Y_PIN_NUM		= 2 
-.equ	SERVOS_PORT			= PORTB
-.equ	SERVOS_DIR			= DDRB
-.equ	DEBUG_PIN_NUM		= 3
-
-.equ 	ADC_X_PIN_NUM 		= 0
-.equ 	ADC_Y_PIN_NUM 		= 1
-.equ 	ADC_PORT 			= PORTC
-.equ 	ADC_DIR 			= DDRC
-
-.equ 	CLR_CLOCK_SELECTOR 	= 0xF8 	; Mascara para setear en cero el Clock Selector de un timer
-
-.equ 	SERVO_STEP			= 6 	; Se va a mover el OCR1A y OCR1B entre [35, 155] con un step de 1 para ir de 0 a 180 grados
-.equ 	SERVO_INITIAL_POS 	= 95 	; Posicion inicial de los servos, equivale a 90°
-.equ 	LOWER_LIMIT 		= 35 	; Limite inferior para ambos servos (OCR1A y OCR1B)
-.equ 	UPPER_LIMIT 		= 155 	; Limite superior para ambos servos (OCR1A y OCR1B)
-.equ 	REMOTE 				= 1 	; Valor para indicar que se encuentra en modo remoto
-.equ 	MANUAL 				= 0 	; Valor para indicar que se encuentra en modo manual
-.equ 	CLEAR_CHANNEL 		= 0xF8 	; Valor para borrar el channel seleccionado en el ADC
-
-.def 	MODE 				= r1 	; Registro que guarda el modo en el cual se encuentra el programa
-.def 	MAPPED_VALUE  		= r2 	; Registro donde se guardar el resultado de hacer un mapeo del valor del ADC en la funcion map_value
-.def 	FLAG 				= r3 	; Registro que sera utilizado como flag
-.def 	FLAG_CONVERT_X 		= r4 	; Registro para saber que canal del ADC convertir. X = 1, Y = 0
-.def 	ADC_HIGH 			= r19  	; Registro donde se guardara el HIGH byte de la conversion de ADC
-.def 	ADC_LOW 			= r20  	; Registro donde se guardara el LOW byte de la conversion de ADC
-.def 	SERVO_X_POSITION	= r21 	; Registro que contendra el valor en el que se encuentra el servo X (Low byte)
-.def 	SERVO_Y_POSITION	= r22 	; Registro que contendra el valor en el que se encuentra el servo Y (Low byte)
-.def	AUX_REGISTER		= r23	; Registro auxiliar para multiples propositos
-.def 	AUX_REGISTER_2 		= r24 	; Registro auxiliar para multiples propositos
-.def 	AUX_REGISTER_3 		= r25	; Registro auxiliar para multiples propositos
+.include "definitions.asm"
 
 .cseg 	; Segmento de memoria de codigo
 .org 0x0000
@@ -63,7 +30,7 @@
     rjmp isr_dato_recibido_usart
 
 .org INT_VECTORS_SIZE
-
+.include "USART.asm"
 start:
 
 ; Se inicializa el Stack Pointer al final de la RAM utilizando la definicion global
@@ -708,168 +675,6 @@ set_mapped_value:
 	pop  	AUX_REGISTER_2
 	pop  	AUX_REGISTER
 	ret
-
-;*************************************************************************************
-; Subrutinas de USART
-;
-;*************************************************************************************
-
-;*************************************************************************************
-; Subrutina que seta la configuración incial de USART
-; 
-;*************************************************************************************
-USART_Init:
-	push r16
-	push r17
-
-	;setear el baud rate en 9600
-	ldi r16, 103
-	ldi r17, 0
-	sts UBRR0H, r17
-	sts UBRR0L, r16
-
-	; Activar recepción y tranmisión
-	ldi r16, (1<<RXEN0)|(1<<TXEN0)
-	sts UCSR0B,r16
-
-	; Setear el formato del frame: 8 bits de datos, 2 de parada
-	ldi r16, (1<<USBS0)|(3<<UCSZ00)
-	sts UCSR0C,r16
-
-	pop r17
-	pop r16
-	ret
-
-;*************************************************************************************
-; Subrutina para transmitir, transmite lo que este guardado en el registro r16
-; 
-;*************************************************************************************
-
-USART_Transmit:
-	;Esperar hasta que el buffer se vacie
-	;(bit UDRE0 en 0)
-	lds r17,UCSR0A
-	sbrs r17,UDRE0
-	rjmp USART_Transmit
-
-	;Envia al buffer lo que haya en r16
-	sts UDR0,r16
-	ret
-
-;*************************************************************************************
-; Subrutina para recibir, guarda lo recibido en r16
-; 
-;*************************************************************************************
-
-USART_Receive:
-
-	;Esperar hasta recibir un dato
-	;(registro RXC0 en 0)
-	lds r17, UCSR0A
-	sbrs r17, RXC0
-	rjmp USART_Receive
-
-	;Obtener lo recibido del buffer y guardarlo en r16
-	lds r16, UDR0
-	ret
-
-;*************************************************************************************
-; Subrutina para transmitir el mensaje inicial
-; "Envíe R para pasar a control por modo remoto"
-;*************************************************************************************
-
-show_init_msg:
-
-	push r16	
-	push r18
-	//apunta a la tabla MSG
-	ldi	zl,LOW(MSJ<<1)
-	ldi	zh,HIGH(MSJ<<1)
-	//largo de la tabla
-	ldi r18, 45
-
-loop_show:
-	//guarda el dato leido en r16
-	//para que luego sea transmitido por USART_Transmit
-	lpm	r16,z+
-	rcall USART_Transmit
-	dec r18
-	brne loop_show
-
-	pop r18
-	pop r16
-	ret
-
-
-; ***************************** INTERRUPTS HANDLER ***********************************
-
-;*************************************************************************************
-; Subrutina para manejar la interrupcion por entrada del teclado
-;
-;*************************************************************************************
-isr_dato_recibido_usart:
-	//guardo el registro de estado
-    in r24, SREG
-	push r24
-
-	//cargo en r16 el dato recibido
-    lds r16, UDR0
-
-	//primero chequeo en que modo estoy
-	mov AUX_REGISTER, mode
-	cpi AUX_REGISTER, REMOTE
-	breq isr_remote_mode 
-
-isr_manual_mode:
-	//en caso de estar en modo manual
-	//solo me importa si llega una 'r' para cambiar de modo
-	cpi r16, 'r'
-	breq isr_change_mode
-
-isr_remote_mode: 
-
-	//chequeo que tecla se presiono
-	//y en base a eso muevo, cambio el modo o salgo
-	cpi r16, 'm'
-	breq isr_change_mode
-
-	cpi r16, 'd'
-	breq isr_move_right
-
-	cpi r16, 'a'
-	breq isr_move_left
-
-	cpi r16, 'w'
-	breq isr_move_up
-
-	cpi r16, 's'
-	breq isr_move_down
-	rjmp fin_int_recibido
-
-isr_move_right:
-	rcall increase_x_position
-	rjmp fin_int_recibido
-
-isr_move_left:
-	rcall decrease_x_position
-	rjmp fin_int_recibido
-
-isr_move_up:
-	rcall increase_y_position
-	rjmp fin_int_recibido
-
-isr_move_down:
-	rcall decrease_y_position
-	rjmp fin_int_recibido
-
-isr_change_mode:
-	rcall change_mode
-
-fin_int_recibido:
-	//restauro el registro de estado
-    out SREG, r24
-	pop r24
-    reti
 
 ;*************************************************************************************
 ; Handler del ADC cuando finaliza la conversion
