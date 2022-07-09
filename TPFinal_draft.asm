@@ -161,9 +161,11 @@ set_default_position_servos:
 increase_x_position:
 	push 	AUX_REGISTER
 	push 	AUX_REGISTER_2
+	push	AUX_REGISTER_3
 	mov 	AUX_REGISTER, SERVO_X_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_upper_limit
-	cpi 	FLAG, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
+	mov		AUX_REGISTER_3, FLAG
+	cpi 	AUX_REGISTER_3, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
 	breq 	end_increase_x_position
 	// No me encuentro en el limite, actualizo la posicion
 	ldi 	AUX_REGISTER, SERVO_STEP
@@ -173,6 +175,7 @@ increase_x_position:
 	ldi 	SERVO_X_POSITION, UPPER_LIMIT ; SERVO_X_POSITION = UPPER_LIMIT
 
 end_increase_x_position:
+	pop		AUX_REGISTER_3
 	pop  	AUX_REGISTER_2
 	pop  	AUX_REGISTER
 	ret
@@ -184,9 +187,11 @@ end_increase_x_position:
 decrease_x_position:
 	push 	AUX_REGISTER
 	push 	AUX_REGISTER_2
+	push	AUX_REGISTER_3
 	mov 	AUX_REGISTER, SERVO_X_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_lower_limit
-	cpi 	FLAG, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
+	mov		AUX_REGISTER_3, FLAG
+	cpi 	AUX_REGISTER_3, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
 	breq 	end_decrease_x_position
 	// No me encuentro en el limite, actualizo la posicion
 	subi 	SERVO_X_POSITION, SERVO_STEP ; SERVO_X_POSITION = SERVO_X_POSITION - SERVO_STEP
@@ -195,6 +200,7 @@ decrease_x_position:
 	ldi 	SERVO_X_POSITION, LOWER_LIMIT ; SERVO_X_POSITION = LOWER_LIMIT
 
 end_decrease_x_position:
+	pop		AUX_REGISTER_3
 	pop  	AUX_REGISTER_2
 	pop  	AUX_REGISTER
 	ret
@@ -206,9 +212,11 @@ end_decrease_x_position:
 increase_y_position:
 	push 	AUX_REGISTER
 	push 	AUX_REGISTER_2
+	push	AUX_REGISTER_3
 	mov 	AUX_REGISTER, SERVO_Y_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_upper_limit
-	cpi 	FLAG, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
+	mov		AUX_REGISTER_3, FLAG
+	cpi 	AUX_REGISTER_3, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
 	breq 	end_increase_y_position
 	// No me encuentro en el limite, actualizo la posicion
 	ldi 	AUX_REGISTER, SERVO_STEP
@@ -218,6 +226,7 @@ increase_y_position:
 	ldi 	SERVO_Y_POSITION, UPPER_LIMIT ; SERVO_Y_POSITION = UPPER_LIMIT
 
 end_increase_y_position:
+	pop		AUX_REGISTER_3
 	pop  	AUX_REGISTER_2
 	pop  	AUX_REGISTER
 	ret
@@ -229,9 +238,11 @@ end_increase_y_position:
 decrease_y_position:
 	push 	AUX_REGISTER
 	push 	AUX_REGISTER_2
+	push	AUX_REGISTER_3
 	mov 	AUX_REGISTER, SERVO_Y_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_lower_limit
-	cpi 	FLAG, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
+	mov		AUX_REGISTER_3, FLAG
+	cpi 	AUX_REGISTER_3, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
 	breq 	end_decrease_y_position
 	// No me encuentro en el limite, actualizo la posicion
 	subi 	SERVO_Y_POSITION, SERVO_STEP ; SERVO_Y_POSITION = SERVO_Y_POSITION - SERVO_STEP
@@ -240,6 +251,7 @@ decrease_y_position:
 	ldi 	SERVO_Y_POSITION, LOWER_LIMIT ; SERVO_Y_POSITION = LOWER_LIMIT
 
 end_decrease_y_position:
+	pop		AUX_REGISTER_3
 	pop  	AUX_REGISTER_2
 	pop  	AUX_REGISTER
 	ret
