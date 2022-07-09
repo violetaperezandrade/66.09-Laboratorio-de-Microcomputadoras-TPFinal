@@ -134,9 +134,11 @@ set_manual_mode:
 ;	
 ;*************************************************************************************
 set_remote_mode:
+	push 	AUX_REGISTER
 	ldi 	AUX_REGISTER, REMOTE
 	mov 	MODE, AUX_REGISTER ; Mode = REMOTE
 	rcall 	disable_adc ; Dejamos de hacer las conversiones del ADC
+	pop 	AUX_REGISTER
 	ret
 
 ;*************************************************************************************
@@ -155,6 +157,8 @@ set_default_position_servos:
 ;	
 ;*************************************************************************************
 increase_x_position:
+	push 	AUX_REGISTER
+	push 	AUX_REGISTER_2
 	mov 	AUX_REGISTER_2, SERVO_X_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_upper_limit
 	cpi 	AUX_REGISTER, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
@@ -167,6 +171,8 @@ increase_x_position:
 	ldi 	SERVO_X_POSITION, UPPER_LIMIT ; SERVO_X_POSITION = UPPER_LIMIT
 
 end_increase_x_position:
+	pop  	AUX_REGISTER_2
+	pop  	AUX_REGISTER
 	ret
 
 ;*************************************************************************************
@@ -174,6 +180,8 @@ end_increase_x_position:
 ;	
 ;*************************************************************************************
 decrease_x_position:
+	push 	AUX_REGISTER
+	push 	AUX_REGISTER_2
 	mov 	AUX_REGISTER_2, SERVO_X_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_lower_limit
 	cpi 	AUX_REGISTER, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
@@ -185,6 +193,8 @@ decrease_x_position:
 	ldi 	SERVO_X_POSITION, LOWER_LIMIT ; SERVO_X_POSITION = LOWER_LIMIT
 
 end_decrease_x_position:
+	pop  	AUX_REGISTER_2
+	pop  	AUX_REGISTER
 	ret
 
 ;*************************************************************************************
@@ -192,6 +202,8 @@ end_decrease_x_position:
 ;	
 ;*************************************************************************************
 increase_y_position:
+	push 	AUX_REGISTER
+	push 	AUX_REGISTER_2
 	mov 	AUX_REGISTER_2, SERVO_Y_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_upper_limit
 	cpi 	AUX_REGISTER, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
@@ -204,6 +216,8 @@ increase_y_position:
 	ldi 	SERVO_Y_POSITION, UPPER_LIMIT ; SERVO_Y_POSITION = UPPER_LIMIT
 
 end_increase_y_position:
+	pop  	AUX_REGISTER_2
+	pop  	AUX_REGISTER
 	ret
 
 ;*************************************************************************************
@@ -211,6 +225,8 @@ end_increase_y_position:
 ;	
 ;*************************************************************************************
 decrease_y_position:
+	push 	AUX_REGISTER
+	push 	AUX_REGISTER_2
 	mov 	AUX_REGISTER_2, SERVO_Y_POSITION ; Cargo en el registro auxiliar el valor actual del servo
 	rcall 	check_servo_lower_limit
 	cpi 	AUX_REGISTER, 0x01 ; Comparo el registro auxiliar con 1, si son iguales estoy en el limite, no realizo nada mas
@@ -222,6 +238,8 @@ decrease_y_position:
 	ldi 	SERVO_Y_POSITION, LOWER_LIMIT ; SERVO_Y_POSITION = LOWER_LIMIT
 
 end_decrease_y_position:
+	pop  	AUX_REGISTER_2
+	pop  	AUX_REGISTER
 	ret
 
 ;*************************************************************************************
